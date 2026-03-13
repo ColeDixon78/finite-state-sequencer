@@ -38,7 +38,7 @@ p = Routine(
         ];
         var deltaStream = r.asStream;
         var pitchStream = r.asStream;
-        var pitches = (Scale.major.degrees + 60).midicps;
+        var pitches = (Scale.minor.degrees + 60).midicps;
         var pitchProbs = [
             [0.1,0.3,0.3,0,0.3,0,0],
             [0,0.1,0.9,0,0,0,0],
