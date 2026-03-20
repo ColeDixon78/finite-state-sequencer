@@ -38,7 +38,7 @@ SynthDef.new(name:\bass, ugenGraphFunc:{
     | out, freq = 440, atk = 0.1, sus = 0.5, rel = 1, amp = 1, gate = 1, pan = 0 , modIdx = 10|
     var high = HPF.ar(
         PMOsc.ar(
-            freq * 6 + LFTri.kr(0.5, mul: 10),
+            freq * 6 + LFTri.kr(LFTri.kr(0.2,mul:0.5), mul: 10),
             LFNoise0.kr(Line.kr(0,12,sus * 2), mul: 8).floor * freq,
             modIdx, 
             mul: 0.1
@@ -66,6 +66,28 @@ SynthDef.new(name:\bass, ugenGraphFunc:{
     var panned = Pan2.ar(Mix.ar([source, high]) , pan + LFTri.kr(1, mul: 0.2));
     Out.ar(bus:out, channelsArray:panned)
 }, rates:nil, prependArgs:nil, variants:nil, metadata:nil).add;
+
+SynthDef.new(name:\kick, ugenGraphFunc:{
+    | out, pan = 0, amp = 1|
+    var source =
+        SinOsc.ar(80 + XLine.kr(40,0,0.01), mul: amp) *
+        Env.perc(0.01, 0.1, -8).ar(doneAction: Done.freeSelf);
+    var noise = BPF.ar(WhiteNoise.ar(amp), 100, 0.1);
+    var panned = Pan2.ar(Mix.ar([source,noise]),pan);
+    Out.ar(bus:out, channelsArray:source)
+}, rates:nil, prependArgs:nil, variants:nil, metadata:nil).add;
+
+SynthDef.new(name:\hihat, ugenGraphFunc:{
+    | out, amp = 1, pan = 0|
+    var source = BPF.ar(
+        WhiteNoise.ar(amp),
+        2800,
+        0.7
+    ) * Env.perc(0.01,0.1,-8).ar(doneAction: Done.freeSelf);
+    var panned = Pan2.ar(source, pan);
+    Out.ar(bus:out, channelsArray:panned)
+}, rates:nil, prependArgs:nil, variants:nil, metadata:nil).add;
+
 )
 
 (
@@ -94,7 +116,6 @@ Tdef(\melody,
         var deltaStream = stochasticPattern.asStream;
         var pitchStream = stochasticPattern.asStream;
         var pitches = (Scale.major.degrees + 53).midicps;
-
         // Pitches will transition randomly from one state to the next
         var pMat1 = [
             [0.1,0.3,0.3,0,0.3,0,0],
@@ -105,7 +126,6 @@ Tdef(\melody,
             [0,0,0.4,0,0.2,0.1,0.3],
             [0.9,0,0,0,0,0.1,0],
         ];
-
         // Pitches are completely deterministic - ascending the scale
         var pMat2 = Array.fill2D(
             pitches.size,
@@ -117,17 +137,17 @@ Tdef(\melody,
         var totalDur = 0;
         while ({totalDur < 4}) {
             nextPitch = pitchStream.next([pitches,pMat1, pitches.size.rand]);
+            nextDelta = deltaStream.next([deltas, deltaProbs, deltas.size.rand]);
             Synth(\simple, [
                 \freq, nextPitch,
                 \freq2, nextPitch * [2,3,6].choose,
                 \pan, 1.0.rand2,
                 \dec, -8,
-                \dur, 4,
+                \dur, nextDelta * 4,
                 \atk, 0.01,
                 \width, 0.2,
                 \amp, rrand(0.3,0.6)
             ]);
-            nextDelta = deltaStream.next([deltas, deltaProbs, deltas.size.rand]);
             totalDur = totalDur + nextDelta;
             nextDelta.yield;
         }
@@ -138,7 +158,17 @@ Tdef(\melody,
 (
 Routine({
     var delta = 6;
+    Pbind(
+        \instrument, \kick,
+        \amp, 0.3,
+        \dur, Pseq([1,1,1,1], inf)
+    ).play;
     loop {
+        Pbind(
+            \instrument, \hihat,
+            \amp, 0.1,
+            \dur, Pgeom(1,1/2,8)
+        ).play;
         Tdef(\melody).play;
         Synth(\bass, [
             \freq: (Scale.major.degrees + 41).choose.midicps,
@@ -152,4 +182,3 @@ Routine({
     }
 }).play;
 )
-
